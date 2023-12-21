@@ -3,6 +3,8 @@
 
 from cog import BasePredictor, Input, Path
 import requests
+import mimetypes
+import time
 
 class Predictor(BasePredictor):
     def setup(self) -> None:
@@ -12,60 +14,53 @@ class Predictor(BasePredictor):
     def predict(
         self,
         token: str = Input(description="Matrix password"),
-        url: str = Input(description="Matrix serve rurl"),
+        url: str = Input(description="Matrix serve server ulr ex : https://matrix.org"),
         room: str = Input(description="Matrix room ex : !ZkngAyfszzfCqwNZUd:phys:phys.ethz.ch"),
         message: str = Input(description="Matrix message"),
-        media: Path = Input(description="Matrix media image or video")
+        media: Path = Input(description="Matrix media image or video"),
     ) -> str:
         
-# curl --data-binary @image.png 'https://matrix.server/_matrix/media/v3/upload?filename=image.png' \
-#   -X 'POST' \
-#   -H 'Authorization: Bearer my_access_token' \
-#   -H 'Content-Type: image/png' \
-#   --compressed
         media = open(media, 'rb')
-        media_type = ''
+        media_type = mimetypes.guess_type(media.name)[0]
+        print(media_type)
 
-        images = ['png', 'jpg', 'jpeg', 'gif']
-        videos = ['mp4', 'mov', 'avi', 'webm']
-        if media.split('.')[-1] in images:
-            media_type = 'image/' + media.split('.')[-1]
-        elif media.split('.')[-1] in videos:
-            media_type = 'video/' + media.split('.')[-1]
-        else:
-            return 'Error: media type not supported'
+# curl -X POST "https://matrix.org/_matrix/media/v3/upload?filename=War+and+Peace.pdf&access_token=syt_eWFzc2luc2lvdWRh_EotvLCnkTTdQlaMwaBJJ_2gikwe" \
+#  -H "Accept: application/json" \
+#  -H "Content-Type: application/pdf" \
+#  -H "Content-Type: application/octet-stream" \
+#  --data-binary @1693991358598.jpeg 
 
-
-
-      
-        media_url = url + '/_matrix/media/v1/upload?filename=' + media.name
-        media_headers = {'Authorization': ' '.join(['Bearer', token])}
-        media_data = {
-            'file': media,
+        headers = {
+            'Content-Type': media_type,
+            'Content-Type': 'application/octet-stream',
         }
-        r = requests.post(media_url, files=media_data, headers=media_headers)
-        media_id = r.json()['content_uri']
-        message = message + '\n' + media_id
+
+        request = requests.post(
+            f"{url}/_matrix/media/v3/upload?filename={media.name}&access_token={token}",
+            headers=headers,
+            data=media
+        )
+        media_response = request.json()
 
 
+        headers = {
+            'Authorization': f"Bearer {token}",
+            'accept': 'application/json',
+            'content-type': 'application/json',
+        }
 
-# curl 'https://matrix.server/_matrix/client/v3/rooms/!rVwmJkYsikYjnIeLNU:matrix.server/send/m.room.message/1212' \
-#   -X 'PUT' \
-#   -H 'Authorization: Bearer my_access_token' \
-#   -H 'accept: application/json' \
-#   -H 'content-type: application/json' \
-#   --data-raw '{"info":{"mimetype":"image/png","size":512,"w":512,"h":512},"msgtype":"m.image","body":"tta.webp","url":"mxc://example.com/AQwafuaFswefuhsfAFAgsw"}' \
-#   --compressed
-
-        url = url + '/_matrix/client/r0/rooms/' + room + '/send/m.room.message'
-        """Run a prediction on the input and return the result"""
-        headers = {'Authorization': ' '.join(['Bearer', token])}
         data = {
-            'msgtype': 'm.image',
-            'body': message,
-            'url': media_id,
+            "msgtype": "m.image",
+            "body": message,
+            "url": media_response['content_uri']
         }
+        
+        tansaction_id =  time.time()
 
+        request = requests.put(
+            f"{url}/_matrix/client/v3/rooms/{room}/send/m.room.message/{tansaction_id}",
+            headers=headers,
+            json=data
+        )
 
-        r = requests.post(url, json=data, headers=headers)
-        return r.text
+        return media_response['content_uri']
