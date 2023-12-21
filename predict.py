@@ -49,11 +49,18 @@ class Predictor(BasePredictor):
             'content-type': 'application/json',
         }
 
-        data = {
-            "msgtype": "m.image",
-            "body": message,
-            "url": media_response['content_uri']
-        }
+        if media_type.startswith("image"):
+            data = {
+                "msgtype": "m.image",
+                "body": message,
+                "url": media_response['content_uri']
+            }
+        elif media_type.startswith("video"):
+            data = {
+                "msgtype": "m.video",
+                "body": message,
+                "url": media_response['content_uri']
+            }
         
         tansaction_id =  time.time()
 
